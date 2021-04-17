@@ -6,11 +6,11 @@ random.seed(123456789)
 
 
 def active_score(load):
-    return np.sum(np.all(load > 0, axis=1))
+    return np.sum(np.all(load > 0, axis=1)) / len(load)
 
 
 def migration_score(mapping1, mapping2, ram):
-    return np.inner(mapping1 != mapping2, ram)
+    return np.inner(mapping1 != mapping2, ram) / np.sum(ram)
 
 
 vm_count = 15
@@ -27,16 +27,18 @@ for i, vm in enumerate(vms):
     init_mapping[i] = loc
     init_resources[loc] += vm
 
-print(active_score(init_resources))
+print('RandomFit active score:', active_score(init_resources))
 
 new_mapping = np.zeros(vm_count)
 new_resources = np.zeros([host_count, 2])
 
-for i, vm in enumerate(vms):
+permutation = np.argsort(vms, axis=0)[:, 1][::-1]
+for i in range(len(vms)):
+    vm = vms[permutation][i]
     possible_locations = np.all(new_resources + vm <= hosts, axis=1)
     loc = (np.arange(0, host_count)[possible_locations])[0]
     new_mapping[i] = loc
     new_resources[loc] += vm
 
-print(active_score(new_resources))
-print(migration_score(init_mapping, new_mapping, vms[:, 1]))
+print('FirstFitDecreasing active score:', active_score(new_resources))
+print('Migration score incurred by transition:', migration_score(init_mapping, new_mapping, vms[:, 1]))
