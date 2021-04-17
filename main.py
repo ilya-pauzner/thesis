@@ -63,11 +63,11 @@ for j in range(len(hosts)):
 matrix = np.zeros([len(vms), len(holes)], dtype=np.int)
 for i in range(len(vms)):
     vm = vms[i]
-    location = new_mapping[i]
+    init_location = init_mapping[i]
     for k in range(len(holes)):
         hole_location, hole_size = holes[k]
         if np.all(vm <= hole_size):
-            if location == hole_location:
+            if init_location == hole_location:
                 matrix[i][k] = 0
             else:
                 matrix[i][k] = vm[1]
