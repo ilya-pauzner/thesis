@@ -31,17 +31,18 @@ def create_problem(problem_type, host_count):
     freq = np.array(freqs[problem_type])
 
     result_resources = np.zeros([host_count, 2], dtype=np.int)
-    result_mapping = []
+    result_hosts = np.array([host for i in range(host_count)])
     result_vms = []
+    result_mapping = []
     while True:
         selected_vm = vm[np.random.choice(np.arange(0, len(vm)), p=(freq / freq.sum()))]
-        possible_locations = np.all(result_resources + selected_vm <= host, axis=1)
+        possible_locations = np.all(result_resources + selected_vm <= result_hosts, axis=1)
         if np.all(possible_locations == 0):
-            return host, result_mapping, result_vms
+            return result_hosts, np.array(result_vms), np.array(result_mapping)
         loc = (np.arange(0, host_count)[possible_locations])[0]
         result_resources[loc] += selected_vm
         result_mapping.append(loc)
-        result_vms.append(vm)
+        result_vms.append(selected_vm)
 
 
 create_problem(0, 100)

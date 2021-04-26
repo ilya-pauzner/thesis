@@ -97,16 +97,15 @@ def migopt_reorder(hosts, vms, mapping, old_mapping):
 
 
 def main():
-    vm_count = 15
-    host_count = 5
-    hosts = np.array([[100, 200] for _ in range(host_count)], dtype=np.int)
-    vms = np.array([[random.randint(10, 30), random.randint(20, 60)] for _ in range(vm_count)], dtype=np.int)
-
+    hosts = np.array([[100, 200] for _ in range(5)], dtype=np.int)
+    vms = np.array([[random.randint(10, 30), random.randint(20, 60)] for _ in range(15)], dtype=np.int)
     init_mapping = random_reorder(hosts, vms, None)
     assert init_mapping is not None
+
+    # hosts, vms, init_mapping = create_problem(3, 50)
     init_resources = calc_load(hosts, vms, init_mapping)
     assert np.all(init_resources <= hosts)
-    print('RandomFit active score:', active_score(init_resources))
+    print('Initial active score:', active_score(init_resources))
 
     new_mapping = ffd_reorder(hosts, vms, init_mapping)
     assert new_mapping is not None
