@@ -43,6 +43,3 @@ def create_problem(problem_type, host_count):
         result_resources[loc] += selected_vm
         result_mapping.append(loc)
         result_vms.append(selected_vm)
-
-
-create_problem(0, 100)

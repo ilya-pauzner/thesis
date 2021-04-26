@@ -1,9 +1,9 @@
-import random
-
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-random.seed(123456789)
+from generate_tests import create_problem
+
+np.random.seed(987654321)
 
 
 def calc_load(hosts, vms, mapping):
@@ -31,7 +31,7 @@ def random_reorder(hosts, vms, mapping=None):
         possible_locations = np.all(init_resources + vm <= hosts, axis=1)
         if np.all(possible_locations == 0):
             return mapping
-        loc = random.choice(np.arange(0, len(hosts))[possible_locations])
+        loc = np.random.choice(np.arange(0, len(hosts))[possible_locations])
         init_mapping[i] = loc
         init_resources[loc] += vm
 
@@ -97,12 +97,14 @@ def migopt_reorder(hosts, vms, mapping, old_mapping):
 
 
 def main():
+    # now it is broken, since arrangements are just too good!
+    hosts, vms, init_mapping = create_problem(1, 100)
+
     hosts = np.array([[100, 200] for _ in range(5)], dtype=np.int)
-    vms = np.array([[random.randint(10, 30), random.randint(20, 60)] for _ in range(15)], dtype=np.int)
+    vms = np.array([[np.random.randint(10, 30), np.random.randint(20, 60)] for _ in range(15)], dtype=np.int)
     init_mapping = random_reorder(hosts, vms, None)
     assert init_mapping is not None
 
-    # hosts, vms, init_mapping = create_problem(3, 50)
     init_resources = calc_load(hosts, vms, init_mapping)
     assert np.all(init_resources <= hosts)
     print('Initial active score:', active_score(init_resources))
