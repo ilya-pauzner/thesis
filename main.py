@@ -21,23 +21,6 @@ def migration_score(mapping1, mapping2, ram):
     return np.inner(mapping1 != mapping2, ram) / np.sum(ram)
 
 
-def random_reorder(hosts, vms, mapping=None):
-    # returns mapping, hosts and vms are the same
-
-    init_mapping = np.zeros(len(vms))
-    init_resources = np.zeros([len(hosts), 2])
-
-    for i, vm in enumerate(vms):
-        possible_locations = np.all(init_resources + vm <= hosts, axis=1)
-        if np.all(possible_locations == 0):
-            return mapping
-        loc = np.random.choice(np.arange(0, len(hosts))[possible_locations])
-        init_mapping[i] = loc
-        init_resources[loc] += vm
-
-    return init_mapping
-
-
 def ffd_reorder(hosts, vms, mapping=None):
     # returns mapping, hosts and vms are the same
 
@@ -102,12 +85,7 @@ def shrink(vms):
 
 
 def main():
-    # now it is broken, since arrangements are just too good!
-    hosts, vms, init_mapping = create_problem(1, 100)
-
-    hosts = np.array([[100, 200] for _ in range(5)])
-    vms = np.array([[np.random.randint(10, 30), np.random.randint(20, 60)] for _ in range(15)])
-    init_mapping = random_reorder(hosts, vms, None)
+    hosts, vms, init_mapping = create_problem(1, 10)
     assert init_mapping is not None
 
     init_resources = calc_load(hosts, vms, init_mapping)

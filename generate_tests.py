@@ -25,7 +25,30 @@ vms = [vm1, vm2, vm3, vm4]
 freqs = [freq1, freq2, freq3, freq4]
 
 
+def random_reorder(hosts, vms, mapping=None):
+    # returns mapping, hosts and vms are the same
+
+    init_mapping = np.zeros(len(vms))
+    init_resources = np.zeros([len(hosts), 2])
+
+    for i, vm in enumerate(vms):
+        possible_locations = np.all(init_resources + vm <= hosts, axis=1)
+        if np.all(possible_locations == 0):
+            return mapping
+        loc = np.random.choice(np.arange(0, len(hosts))[possible_locations])
+        init_mapping[i] = loc
+        init_resources[loc] += vm
+
+    return init_mapping
+
+
 def create_problem(problem_type, host_count):
+    if problem_type == -1:
+        result_hosts = np.array([[100, 200] for _ in range(host_count)])
+        result_vms = np.array([[np.random.randint(10, 30), np.random.randint(20, 60)] for _ in range(3 * host_count)])
+        result_mapping = random_reorder(hosts, vms, None)
+        return result_hosts, result_vms, result_mapping
+
     host = np.array(hosts[problem_type])
     vm = np.array(vms[problem_type])
     freq = np.array(freqs[problem_type])
