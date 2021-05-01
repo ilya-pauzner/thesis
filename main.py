@@ -1,3 +1,5 @@
+import platform
+
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
@@ -19,6 +21,25 @@ def active_score(load):
 
 def migration_score(mapping1, mapping2, ram):
     return np.inner(mapping1 != mapping2, ram) / np.sum(ram)
+
+
+def solver_reorder(hosts, vms, mapping=None):
+    from pyvpsolver.solvers import vbpsolver
+    W = hosts[0]
+    w, b = np.unique(vms, return_counts=True, axis=0)
+    obj, lst_sol = vbpsolver.solve(W, w, b, script="vpsolver_coinor.sh", verbose=False)
+    flat_sol = []
+    host_indices = [[] for _ in range(len(w))]
+    for host_count, host in lst_sol[0]:
+        for _ in range(host_count):
+            flat_sol.append(host)
+    for host_ind, host in enumerate(flat_sol):
+        for vm_ind, _ in host:
+            host_indices[vm_ind].append(host_ind)
+    new_mapping = np.zeros(len(vms), dtype=np.uint)
+    for vm_ind, vm in enumerate(w):
+        new_mapping[np.all(vms == vm, axis=1)] = np.array(host_indices[vm_ind], dtype=np.uint)
+    return new_mapping
 
 
 def ffd_reorder(hosts, vms, mapping=None):
@@ -80,12 +101,14 @@ def migopt_reorder(hosts, vms, mapping, old_mapping):
 
 
 def shrink(vms):
-    multiplier = np.clip(np.random.random([len(vms), 2]) + 0.5, 0.5, 1)
-    return vms * multiplier
+    unique_vms, indices = np.unique(vms, axis=0, return_inverse=True)
+    multiplier = np.clip(np.random.random([len(unique_vms), 2]) + 0.25, 0.5, 1)
+    new_unique_vms = unique_vms * multiplier
+    return np.ceil(new_unique_vms[indices]).astype(np.uint)
 
 
 def main():
-    hosts, vms, init_mapping = create_problem(1, 10)
+    hosts, vms, init_mapping = create_problem(3, 100)
     assert init_mapping is not None
 
     init_resources = calc_load(hosts, vms, init_mapping)
@@ -96,12 +119,16 @@ def main():
     print('Shrinking VMs by random factor from 0.5 to 1, in real life this corresponds to real usage statistics:')
     print('Most customers do not fully consume their quotas - this makes resources overbooking possible.')
     print('Now, VM requirements are smaller than before, so that we can rearrange them in order to free hosts.')
-
-    new_mapping = ffd_reorder(hosts, new_vms, init_mapping)
+    if platform.system() == 'Linux':
+        new_mapping = solver_reorder(hosts, new_vms, init_mapping)
+        algorithm = 'PyVPSolver bin packing'
+    else:
+        new_mapping = ffd_reorder(hosts, new_vms, init_mapping)
+        algorithm = 'FirstFitDecreasing'
     assert new_mapping is not None
     new_resources = calc_load(hosts, new_vms, new_mapping)
     assert np.all(new_resources <= hosts)
-    print('FirstFitDecreasing active score:', active_score(new_resources))
+    print(f'{algorithm} active score:', active_score(new_resources))
     print('Migration score incurred by transition:', migration_score(init_mapping, new_mapping, new_vms[:, 1]))
 
     updated_mapping = migopt_reorder(hosts, new_vms, new_mapping, init_mapping)
