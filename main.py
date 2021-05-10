@@ -172,7 +172,7 @@ def main():
     setups = [
         #   Type, Hosts, Shrink
         [3, 100, True],
-        # [-3, 40, False]
+        [-3, 100, False]
     ]
 
     for task_type, host_count, shrink in setups:
@@ -192,6 +192,8 @@ def main():
             print('Most customers do not fully consume their quotas - this makes resources overbooking possible.')
             print('Now, VM requirements are smaller than before, so that we can rearrange them in order to free hosts.')
             print()
+        else:
+            new_vms = vms
 
         if platform.system() == 'Linux':
             new_mapping = report_algorithm('PyVPSolver', solver_reorder, hosts, new_vms, init_mapping)
