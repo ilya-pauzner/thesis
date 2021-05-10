@@ -152,18 +152,22 @@ def do_shrink(vms):
     return np.ceil(new_unique_vms[indices]).astype(np.uint)
 
 
-def report_algorithm(algo_name, algo_fn, hosts, vms, init_mapping, mapping_for_migration_score=None):
-    if mapping_for_migration_score is None:
-        new_mapping = algo_fn(hosts, vms, init_mapping)
-        mapping_for_migration_score = init_mapping
-    else:
-        new_mapping = algo_fn(hosts, vms, init_mapping, mapping_for_migration_score)
+def with_migopt(algo):
+    def inner(hosts, vms, init_mapping):
+        new_mapping = algo(hosts, vms, init_mapping)
+        return migopt_reorder(hosts, vms, new_mapping, init_mapping)
+
+    return inner
+
+
+def report_algorithm(algo_name, algo_fn, hosts, vms, init_mapping):
+    new_mapping = algo_fn(hosts, vms, init_mapping)
     assert new_mapping is not None
     new_resources = calc_load(hosts, vms, new_mapping)
     assert np.all(new_resources <= hosts)
     print(f'{algo_name} results:')
     print('active score:', active_score(new_resources))
-    print('migration score:', migration_score(mapping_for_migration_score, new_mapping, vms[:, 1]))
+    print('migration score:', migration_score(init_mapping, new_mapping, vms[:, 1]))
     print()
     return new_mapping
 
