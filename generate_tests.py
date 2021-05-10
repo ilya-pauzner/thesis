@@ -2,8 +2,6 @@ import copy
 
 import numpy as np
 
-np.random.seed(987654321)
-
 # generally useless, easily packs to (250, xxx) - best possible
 host1 = [250, 700]
 vm1 = [[1, 1], [2, 4], [2, 8], [8, 16], [4, 8], [4, 16], [8, 32]]
@@ -22,9 +20,9 @@ host4 = [75, 150]
 vm4 = [[64, 128], [16, 32], [2, 4], [32, 64], [4, 8]]
 freq4 = [1, 5, 2, 5, 1]
 
-hosts = [host1, host2, host3, host4]
-vms = [vm1, vm2, vm3, vm4]
-freqs = [freq1, freq2, freq3, freq4]
+hosts = [None, host1, host2, host3, host4]
+vms = [None, vm1, vm2, vm3, vm4]
+freqs = [None, freq1, freq2, freq3, freq4]
 
 
 def random_reorder(hosts, vms, mapping=None):
@@ -44,7 +42,8 @@ def random_reorder(hosts, vms, mapping=None):
     return init_mapping
 
 
-def create_problem(problem_type, host_count):
+def create_problem(problem_type, host_count, random_seed=987654321):
+    np.random.seed(random_seed)
     if problem_type < 0:
         # full pack with problem_type -problem_type
         problem_type *= -1

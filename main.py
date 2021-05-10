@@ -1,7 +1,9 @@
 import copy
 import platform
+import time
 
 import numpy as np
+import pandas as pd
 from scipy.optimize import linear_sum_assignment
 
 from generate_tests import create_problem
@@ -161,52 +163,66 @@ def with_migopt(algo):
 
 
 def report_algorithm(algo_name, algo_fn, hosts, vms, init_mapping):
+    t0 = time.time()
     new_mapping = algo_fn(hosts, vms, init_mapping)
+    t1 = time.time()
     assert new_mapping is not None
     new_resources = calc_load(hosts, vms, new_mapping)
     assert np.all(new_resources <= hosts)
     print(f'{algo_name} results:')
-    print('active score:', active_score(new_resources))
-    print('migration score:', migration_score(init_mapping, new_mapping, vms[:, 1]))
+    active = active_score(new_resources)
+    migr = migration_score(init_mapping, new_mapping, vms[:, 1])
+    print('active score:', active)
+    print('migration score:', migr)
     print()
-    return new_mapping
+    return {"algo": algo_name, "active": active, "migr": migr, "time": t1 - t0}
 
 
 def main():
-    setups = [
-        #   Type, Hosts, Shrink
-        [3, 100, True],
-        [-3, 100, False]
-    ]
+    df = pd.DataFrame(columns=["seed", "task_type", "host_count", "shrink", "algo", "active", "migr", "time"])
+    for task_type in [-4, -3, 3, 4]:
+        for host_count in [10, 20, 40, 80]:
+            shrink = task_type > 0
+            for seed in range(5):
+                print('=' * 80)
+                print('TEST SETTINGS:')
+                print(f'Task type: {task_type}')
+                print(f'Host count: {host_count}')
+                print(f'Shrink: {shrink}')
 
-    for task_type, host_count, shrink in setups:
-        print('=' * 80)
-        print('TEST SETTINGS:')
-        print(f'Task type: {task_type}')
-        print(f'Host count: {host_count}')
-        print(f'Shrink: {shrink}')
+                hosts, vms, init_mapping = create_problem(task_type, host_count)
+                if shrink:
+                    new_vms = do_shrink(vms)
+                    print('Shrinking VMs by random factor in [0.5; 1], this corresponds to real usage statistics:')
+                    print('Most customers do not fully consume their quotas - this makes overbooking possible.')
+                    print('VM requirements are smaller now, so that we can rearrange them in order to free hosts.')
+                    print()
+                else:
+                    new_vms = vms
 
-        hosts, vms, init_mapping = create_problem(task_type, host_count)
-        if shrink:
-            new_vms = do_shrink(vms)
-            print('Shrinking VMs by random factor in [0.5; 1], in real life this corresponds to real usage statistics:')
-            print('Most customers do not fully consume their quotas - this makes resources overbooking possible.')
-            print('Now, VM requirements are smaller than before, so that we can rearrange them in order to free hosts.')
-            print()
-        else:
-            new_vms = vms
-        algorithms = [
-            ['Initial', dummy_reorder],
-            ['FirstFitDecreasing', ffd_reorder],
-            ['Sercon', sercon_reorder]
-        ]
+                algorithms = [
+                    ['Initial', dummy_reorder],
+                    ['FirstFitDecreasing', ffd_reorder],
+                    ['Sercon', sercon_reorder]
+                ]
+                if platform.system() == 'Linux':
+                    algorithms.append(['PyVPSolver', solver_reorder])
 
-        if platform.system() == 'Linux':
-            algorithms.append(['PyVPSolver', solver_reorder])
+                wrappers = [
+                    # Change name, Change Function
+                    [(lambda x: x), (lambda x: x)],
+                    [(lambda x: f'{x} + migopt'), with_migopt]
+                ]
+                for algo_name, algo_fn in algorithms:
+                    for wrap_name, wrap_fn in wrappers:
+                        results = report_algorithm(wrap_name(algo_name), wrap_fn(algo_fn), hosts, new_vms, init_mapping)
+                        results["seed"] = seed
+                        results["task_type"] = task_type
+                        results["host_count"] = host_count
+                        results["shrink"] = shrink
+                        df = df.append(results, ignore_index=True)
 
-        for algo_name, algo_fn in algorithms:
-            report_algorithm(algo_name, algo_fn, hosts, new_vms, init_mapping)
-            report_algorithm(f'{algo_name} + migopt', with_migopt(algo_fn), hosts, new_vms, init_mapping)
+    df.to_csv('results.csv', index=False)
 
 
 if __name__ == '__main__':
