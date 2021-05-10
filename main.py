@@ -187,9 +187,6 @@ def main():
         print(f'Shrink: {shrink}')
 
         hosts, vms, init_mapping = create_problem(task_type, host_count)
-
-        report_algorithm('Initial', dummy_reorder, hosts, vms, init_mapping)
-
         if shrink:
             new_vms = do_shrink(vms)
             print('Shrinking VMs by random factor in [0.5; 1], in real life this corresponds to real usage statistics:')
@@ -198,15 +195,18 @@ def main():
             print()
         else:
             new_vms = vms
+        algorithms = [
+            ['Initial', dummy_reorder],
+            ['FirstFitDecreasing', ffd_reorder],
+            ['Sercon', sercon_reorder]
+        ]
 
         if platform.system() == 'Linux':
-            new_mapping = report_algorithm('PyVPSolver', solver_reorder, hosts, new_vms, init_mapping)
-            report_algorithm('PyVPSolver + migopt', migopt_reorder, hosts, new_vms, new_mapping, init_mapping)
+            algorithms.append(['PyVPSolver', solver_reorder])
 
-        new_mapping = report_algorithm('FirstFitDecreasing', ffd_reorder, hosts, new_vms, init_mapping)
-        report_algorithm('FirstFitDecreasing + migopt', migopt_reorder, hosts, new_vms, new_mapping, init_mapping)
-
-        report_algorithm('Sercon', sercon_reorder, hosts, new_vms, init_mapping)
+        for algo_name, algo_fn in algorithms:
+            report_algorithm(algo_name, algo_fn, hosts, new_vms, init_mapping)
+            report_algorithm(f'{algo_name} + migopt', with_migopt(algo_fn), hosts, new_vms, init_mapping)
 
 
 if __name__ == '__main__':
