@@ -145,7 +145,7 @@ def migopt_reorder(hosts, vms, mapping, old_mapping):
     return updated_mapping
 
 
-def shrink(vms):
+def do_shrink(vms):
     unique_vms, indices = np.unique(vms, axis=0, return_inverse=True)
     multiplier = np.clip(np.random.random([len(unique_vms), 2]) + 0.25, 0.5, 1)
     new_unique_vms = unique_vms * multiplier
@@ -169,24 +169,38 @@ def report_algorithm(algo_name, algo_fn, hosts, vms, init_mapping, mapping_for_m
 
 
 def main():
-    hosts, vms, init_mapping = create_problem(3, 100)
+    setups = [
+        #   Type, Hosts, Shrink
+        [3, 100, True],
+        # [-3, 40, False]
+    ]
 
-    report_algorithm('Initial', dummy_reorder, hosts, vms, init_mapping)
+    for task_type, host_count, shrink in setups:
+        print('=' * 80)
+        print('TEST SETTINGS:')
+        print(f'Task type: {task_type}')
+        print(f'Host count: {host_count}')
+        print(f'Shrink: {shrink}')
 
-    new_vms = shrink(vms)
-    print('Shrinking VMs by random factor from 0.5 to 1, in real life this corresponds to real usage statistics:')
-    print('Most customers do not fully consume their quotas - this makes resources overbooking possible.')
-    print('Now, VM requirements are smaller than before, so that we can rearrange them in order to free hosts.')
-    print()
+        hosts, vms, init_mapping = create_problem(task_type, host_count)
 
-    if platform.system() == 'Linux':
-        new_mapping = report_algorithm('PyVPSolver bin packing', solver_reorder, hosts, new_vms, init_mapping)
-        report_algorithm('PyVPSolver bin packing + migopt', migopt_reorder, hosts, new_vms, new_mapping, init_mapping)
+        report_algorithm('Initial', dummy_reorder, hosts, vms, init_mapping)
 
-    new_mapping = report_algorithm('FirstFitDecreasing', ffd_reorder, hosts, new_vms, init_mapping)
-    report_algorithm('FirstFitDecreasing + migopt', migopt_reorder, hosts, new_vms, new_mapping, init_mapping)
+        if shrink:
+            new_vms = do_shrink(vms)
+            print('Shrinking VMs by random factor in [0.5; 1], in real life this corresponds to real usage statistics:')
+            print('Most customers do not fully consume their quotas - this makes resources overbooking possible.')
+            print('Now, VM requirements are smaller than before, so that we can rearrange them in order to free hosts.')
+            print()
 
-    report_algorithm('Sercon', sercon_reorder, hosts, new_vms, init_mapping)
+        if platform.system() == 'Linux':
+            new_mapping = report_algorithm('PyVPSolver', solver_reorder, hosts, new_vms, init_mapping)
+            report_algorithm('PyVPSolver + migopt', migopt_reorder, hosts, new_vms, new_mapping, init_mapping)
+
+        new_mapping = report_algorithm('FirstFitDecreasing', ffd_reorder, hosts, new_vms, init_mapping)
+        report_algorithm('FirstFitDecreasing + migopt', migopt_reorder, hosts, new_vms, new_mapping, init_mapping)
+
+        report_algorithm('Sercon', sercon_reorder, hosts, new_vms, init_mapping)
 
 
 if __name__ == '__main__':

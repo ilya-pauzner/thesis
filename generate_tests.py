@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 
 np.random.seed(987654321)
@@ -43,11 +45,41 @@ def random_reorder(hosts, vms, mapping=None):
 
 
 def create_problem(problem_type, host_count):
-    if problem_type == -1:
-        result_hosts = np.array([[100, 200] for _ in range(host_count)])
-        result_vms = np.array([[np.random.randint(10, 30), np.random.randint(20, 60)] for _ in range(3 * host_count)])
-        result_mapping = random_reorder(hosts, vms, None)
-        return result_hosts, result_vms, result_mapping
+    if problem_type < 0:
+        # full pack with problem_type -problem_type
+        problem_type *= -1
+        host = np.array(hosts[problem_type])
+        vm = np.array(vms[problem_type])
+        host = (host // np.gcd.reduce(vm)) * np.gcd.reduce(vm)
+        freq = np.array(freqs[problem_type])
+
+        dense_resources = []
+        dense_hosts = []
+        result_vms = []
+        dense_mapping = []
+        while len(dense_hosts) < host_count // 2:
+            backup_vms = copy.copy(result_vms)
+            backup_mapping = copy.copy(dense_mapping)
+            dense_hosts.append(host)
+            dense_resources.append(np.zeros(2))
+            steps = 0
+            max_steps = 1000
+            while steps < max_steps and not np.any(dense_resources[-1] == dense_hosts[-1]):
+                selected_vm = vm[np.random.choice(np.arange(0, len(vm)), p=(freq / freq.sum()))]
+                if np.all(dense_resources[-1] + selected_vm <= dense_hosts[-1]):
+                    dense_resources[-1] += selected_vm
+                    dense_mapping.append(len(dense_resources) - 1)
+                    result_vms.append(selected_vm)
+                steps += 1
+            if steps == max_steps:
+                # failed to pack, backtracking
+                result_vms = backup_vms
+                dense_mapping = backup_mapping
+                dense_hosts = dense_hosts[:-1]
+                dense_resources = dense_resources[:-1]
+        result_hosts = np.array([host for i in range(host_count)])
+        result_mapping = random_reorder(result_hosts, np.array(result_vms), np.array(dense_mapping))
+        return result_hosts, np.array(result_vms), result_mapping
 
     host = np.array(hosts[problem_type])
     vm = np.array(vms[problem_type])
