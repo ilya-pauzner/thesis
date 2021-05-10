@@ -115,7 +115,7 @@ def migopt_reorder(hosts, vms, mapping, old_mapping):
     max_vm = np.max(vms, axis=0)
     for j in range(len(hosts)):
         remaining = hosts[j] - resources[j]
-        if np.any(remaining != 0):
+        if np.any(remaining != 0) and np.any(resources[j] != 0):
             times = np.min(remaining // max_vm)
             for _ in range(int(times)):
                 holes.append((j, max_vm))
@@ -152,13 +152,19 @@ def shrink(vms):
     return np.ceil(new_unique_vms[indices]).astype(np.uint)
 
 
-def report_algorithm(algo_name, algo_fn, hosts, vms, init_mapping):
-    new_mapping = algo_fn(hosts, vms, init_mapping)
+def report_algorithm(algo_name, algo_fn, hosts, vms, init_mapping, mapping_for_migration_score=None):
+    if mapping_for_migration_score is None:
+        new_mapping = algo_fn(hosts, vms, init_mapping)
+        mapping_for_migration_score = init_mapping
+    else:
+        new_mapping = algo_fn(hosts, vms, init_mapping, mapping_for_migration_score)
     assert new_mapping is not None
     new_resources = calc_load(hosts, vms, new_mapping)
     assert np.all(new_resources <= hosts)
-    print(f'{algo_name} active score:', active_score(new_resources))
-    print(f'{algo_name} migration score:', migration_score(init_mapping, new_mapping, vms[:, 1]))
+    print(f'{algo_name} results:')
+    print('active score:', active_score(new_resources))
+    print('migration score:', migration_score(mapping_for_migration_score, new_mapping, vms[:, 1]))
+    print()
     return new_mapping
 
 
@@ -171,22 +177,16 @@ def main():
     print('Shrinking VMs by random factor from 0.5 to 1, in real life this corresponds to real usage statistics:')
     print('Most customers do not fully consume their quotas - this makes resources overbooking possible.')
     print('Now, VM requirements are smaller than before, so that we can rearrange them in order to free hosts.')
+    print()
+
     if platform.system() == 'Linux':
-        algo_name = 'PyVPSolver bin packing'
-        algo_fn = solver_reorder
-    else:
-        algo_name = 'FirstFitDecreasing'
-        algo_fn = ffd_reorder
-    new_mapping = report_algorithm(algo_name, algo_fn, hosts, new_vms, init_mapping)
+        new_mapping = report_algorithm('PyVPSolver bin packing', solver_reorder, hosts, new_vms, init_mapping)
+        report_algorithm('PyVPSolver bin packing + migopt', migopt_reorder, hosts, new_vms, new_mapping, init_mapping)
 
-    updated_mapping = migopt_reorder(hosts, new_vms, new_mapping, init_mapping)
-    assert updated_mapping is not None
-    updated_resources = calc_load(hosts, new_vms, updated_mapping)
-    assert np.all(updated_resources <= hosts)
-    print(f'(Optimized by migopt) {algo_name} migration score:',
-          migration_score(init_mapping, updated_mapping, new_vms[:, 1]))
+    new_mapping = report_algorithm('FirstFitDecreasing', ffd_reorder, hosts, new_vms, init_mapping)
+    report_algorithm('FirstFitDecreasing + migopt', migopt_reorder, hosts, new_vms, new_mapping, init_mapping)
 
-    sercon_mapping = report_algorithm('Sercon', sercon_reorder, hosts, new_vms, init_mapping)
+    report_algorithm('Sercon', sercon_reorder, hosts, new_vms, init_mapping)
 
 
 if __name__ == '__main__':
