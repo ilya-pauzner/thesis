@@ -12,9 +12,8 @@ np.random.seed(987654321)
 
 
 def calc_load(hosts, vms, mapping):
-    load = np.zeros([len(hosts), 2])
-    for vm, loc in zip(vms, mapping):
-        load[int(loc)] += vm
+    load = np.zeros_like(hosts)
+    np.add.at(load, np.array(mapping, dtype=np.int), vms)
     return load
 
 
@@ -38,8 +37,7 @@ def solver_reorder(hosts, vms, mapping=None):
     flat_sol = []
     host_indices = [[] for _ in range(len(w))]
     for host_count, host in lst_sol[0]:
-        for _ in range(host_count):
-            flat_sol.append(host)
+        flat_sol.extend([host] * host_count)
     for host_ind, host in enumerate(flat_sol):
         for vm_ind, _ in host:
             host_indices[vm_ind].append(host_ind)
@@ -61,10 +59,7 @@ def sercon_reorder(hosts, vms, mapping=None):
         for current_host_ind in permutation:
             if not np.all(host_loads[current_host_ind] == 0):
                 # host is not already free
-                vm_inds_of_this_host = []
-                for vm_ind in range(len(new_mapping)):
-                    if new_mapping[vm_ind] == current_host_ind:
-                        vm_inds_of_this_host.append(vm_ind)
+                vm_inds_of_this_host = np.flatnonzero(new_mapping == current_host_ind)
 
                 # trying to unload them
                 backup_mapping = copy.copy(new_mapping)
@@ -73,13 +68,14 @@ def sercon_reorder(hosts, vms, mapping=None):
                 good[current_host_ind] = False
                 for vm_ind in vm_inds_of_this_host:
                     possible_locations = good & np.all(host_loads + vms[vm_ind] <= hosts, axis=1)
-                    if np.all(possible_locations == 0):
+                    locations = np.flatnonzero(possible_locations)
+                    if len(locations) == 0:
                         # failed to reorder, return existing mapping
                         new_mapping = backup_mapping
                         host_loads = backup_host_loads
                         break
 
-                    loc = np.arange(0, len(hosts))[possible_locations][0]
+                    loc = locations[0]
                     new_mapping[vm_ind] = loc
                     host_loads[loc] += vms[vm_ind]
                     host_loads[current_host_ind] -= vms[vm_ind]
@@ -92,17 +88,18 @@ def sercon_reorder(hosts, vms, mapping=None):
 def ffd_reorder(hosts, vms, mapping=None):
     # returns mapping, hosts and vms are the same
 
-    new_resources = np.zeros([len(hosts), 2])
+    new_resources = np.zeros_like(hosts)
     new_mapping = np.zeros(len(vms))
 
     permutation = np.argsort(vms, axis=0)[:, 1][::-1]
     for i in range(len(vms)):
         vm = vms[permutation][i]
         possible_locations = np.all(new_resources + vm <= hosts, axis=1)
-        if np.all(possible_locations == 0):
+        locations = np.flatnonzero(possible_locations)
+        if len(locations) == 0:
             # failed to reorder, return existing mapping
             return mapping
-        loc = (np.arange(0, len(hosts))[possible_locations])[0]
+        loc = locations[0]
         new_mapping[permutation[i]] = loc
         new_resources[loc] += vm
 
@@ -111,16 +108,13 @@ def ffd_reorder(hosts, vms, mapping=None):
 
 def migopt_reorder(hosts, vms, mapping, old_mapping):
     resources = calc_load(hosts, vms, mapping)
-    holes = []
-    for i in range(len(vms)):
-        holes.append((mapping[i], vms[i]))
+    holes = list(zip(mapping, vms))
     max_vm = np.max(vms, axis=0)
     for j in range(len(hosts)):
         remaining = hosts[j] - resources[j]
         if np.any(remaining != 0) and np.any(resources[j] != 0):
             times = np.min(remaining // max_vm)
-            for _ in range(int(times)):
-                holes.append((j, max_vm))
+            holes.extend([(j, max_vm)] * int(times))
             holes.append((j, remaining - max_vm * times))
 
     matrix = np.zeros([len(vms), len(holes)])
@@ -139,12 +133,8 @@ def migopt_reorder(hosts, vms, mapping, old_mapping):
 
     # hole == [where, size]
     row_ind, col_ind = linear_sum_assignment(matrix)
-    updated_mapping = np.zeros(len(vms))
-    for i in range(len(vms)):
-        hole_location, hole_size = holes[col_ind[i]]
-        updated_mapping[i] = hole_location
-
-    return updated_mapping
+    hole_locations = np.array([hole_location for hole_location, hole_size in holes])
+    return hole_locations[col_ind]
 
 
 def do_shrink(vms):
