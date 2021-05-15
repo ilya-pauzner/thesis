@@ -1,14 +1,11 @@
+import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
 
 df = pd.read_csv('results.csv')
 algos = {"Initial", "FirstFitDecreasing", "FirstFitDecreasing + migopt", "PyVPSolver", "PyVPSolver + migopt", "Sercon"}
 filtered_df = df[df.algo.isin(algos)]
-g = sns.FacetGrid(filtered_df, col="task_type")
-g.map(sns.scatterplot, "active", "migr", "algo")
-plt.legend()
-g = sns.FacetGrid(filtered_df, col="task_type")
-g.map(sns.scatterplot, "host_count", "time", "algo")
-plt.legend()
+filtered_df = filtered_df.assign(abs_task_type=filtered_df["task_type"].abs())
+sns.relplot(data=filtered_df, x="active", y="migr", style="algo", col="abs_task_type", row="shrink")
+sns.relplot(data=filtered_df, x="host_count", y="time", style="algo", col="abs_task_type", row="shrink")
 plt.show()
