@@ -4,8 +4,10 @@ import seaborn as sns
 
 
 def plot(data, x, y, filename):
-    sns.relplot(data=data, x=x, y=y, hue="algo", style="algo", row="abs_task_type", s=200)
-    plt.tight_layout()
+    g = sns.relplot(data=data, x=x, y=y, hue="algo", style="algo", row="abs_task_type", s=200, facet_kws={"legend_out": True})
+    plt.gcf().subplots_adjust(bottom=0.25)
+    g._legend.set_bbox_to_anchor((0.5, 0.1))
+    g._legend.set_frame_on(True)
     plt.savefig(filename)
 
 
